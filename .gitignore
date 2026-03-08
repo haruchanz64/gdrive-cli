@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Google OAuth credentials and tokens — never commit these
+client_secret*.json
+credentials.json
+token.json
+*.bak
+
+# Test coverage output
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Editor directories
+.vscode/
+.idea/
+
+# Environment files
+.env
+.env.*
+
+# Temporary files
+*.tmp
+*.temp

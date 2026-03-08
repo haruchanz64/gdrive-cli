@@ -1,0 +1,27 @@
+{
+  "name": "gdrive-cli",
+  "version": "1.0.0",
+  "description": "A Git-like CLI for Google Drive — pull, push, status, diff and more.",
+  "main": "cli.js",
+  "bin": {
+    "gdrive": "./cli.js"
+  },
+  "scripts": {
+    "start": "node cli.js",
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^11.0.0",
+    "fs-extra": "^11.1.1",
+    "googleapis": "^171.4.0",
+    "inquirer": "^8.2.6",
+    "md5-file": "^5.0.0",
+    "ora": "^5.4.1"
+  },
+  "devDependencies": {
+    "jest": "^30.2.0"
+  }
+}
