@@ -81,9 +81,18 @@ copy and paste.
 ## Quick start
 
 ```bash
-# Link a local directory to an existing Drive folder
+# Start in your project directory
 cd my-project
+
+# Option 1: Create a new Drive folder automatically (uses local directory name)
+gdrive init
+
+# Option 2: Create a new Drive folder with a custom name
+gdrive init --name "My Project Folder"
+
+# Option 3: Link to an existing Drive folder
 gdrive init https://drive.google.com/drive/folders/1xYzABC...
+```
 
 # See what is on the remote
 gdrive status
@@ -99,11 +108,25 @@ gdrive push
 
 ## Commands
 
-### `gdrive init <folderUrl>`
+### `gdrive init [folderUrl]`
 
-Link the current directory to a Google Drive folder.
+Initialize the current directory as a gdrive repository.
+
+- If `folderUrl` (or raw folder ID) is provided, links to that existing Drive folder.
+- If omitted, creates a new Drive folder automatically.
+- Use `--name <n>` to set the remote folder name when creating a folder (or override display name when linking).
+- Creates `.gdrive/` with `config.json` and `index.json`.
+- Creates `.gdriveignore` if missing.
+- If `.gitignore` exists, appends `.gdrive/` when not already present.
 
 ```bash
+# Create a new Drive folder named after the current directory
+gdrive init
+
+# Create a new Drive folder with an explicit name
+gdrive init --name "Project Backup"
+
+# Link to an existing Drive folder
 gdrive init https://drive.google.com/drive/folders/1xYzABC...
 gdrive init 1xYzABC...    # raw folder ID also works
 ```
@@ -235,7 +258,7 @@ node_modules/
 ```
 
 A default `.gdriveignore` is created automatically when you run `gdrive init`
-or `gdrive clone`.
+(or `gdrive clone`) if one does not already exist.
 
 ---
 
