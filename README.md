@@ -102,7 +102,6 @@ gdrive pull
 
 # Make some changes, then upload them
 gdrive push
-```
 
 ---
 
