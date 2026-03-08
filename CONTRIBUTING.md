@@ -10,7 +10,7 @@ project running locally, the testing setup, and the general pull request process
 You will need Node.js 18 or later.
 
 ```bash
-git clone https://github.com/your-username/gdrive-cli
+git clone https://github.com/haruchanz64/gdrive-cli
 cd gdrive-cli
 npm install
 npm link        # makes "gdrive" available as a global command
@@ -87,7 +87,7 @@ Keep your `client_secret.json` and `~/.gdrive/token.json` out of the repo
 - [ ] `npm test` passes with no failures
 - [ ] New behaviour is covered by a test
 - [ ] No credentials, tokens, or personal Drive folder IDs are committed
-- [ ] README is updated if a command or flag changed
+- [ ] README/CONTRIBUTING are updated if command usage changed (for example, `gdrive init [folderUrl]` or `--name`)
 
 ---
 
