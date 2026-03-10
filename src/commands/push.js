@@ -109,7 +109,7 @@ cmd
         return;
       }
 
-      console.log(chalk.cyan(`\n⬆ Pushing ${toUpload.length} file(s)...\n`));
+      console.log(chalk.cyan(`\nPushing ${toUpload.length} file(s)...\n`));
 
       let success = 0;
       let failed = 0;
@@ -151,7 +151,7 @@ cmd
           );
           success++;
         } catch (e) {
-          spinner.fail(chalk.red(`${rel} — ${e.message}`));
+          spinner.fail(chalk.red(`  ${file.rel} — ${e.message}`));
           failed++;
         }
       }
@@ -168,7 +168,7 @@ cmd
             delete index.files[file.rel];
             spinner.succeed(chalk.red(`  - ${file.rel}`));
           } catch (e) {
-            spinner.fail(chalk.red(`  ✖ ${file.rel} — ${e.message}`));
+            spinner.fail(chalk.red(`  ${file.rel} — ${e.message}`));
           }
         }
       }

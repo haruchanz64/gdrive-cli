@@ -92,7 +92,7 @@ async function loadToken() {
       const fileToken = await fs.readJson(TOKEN_PATH);
       await keytar.setPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT, JSON.stringify(fileToken));
       await fs.remove(TOKEN_PATH);
-      console.log(chalk.green("  ✔ Migration complete.\n"));
+      console.log(chalk.green("Migration complete.\n"));
       return fileToken;
     }
     return null;
@@ -205,7 +205,7 @@ async function runBrowserFlow(oauth2Client) {
   oauth2Client.setCredentials(tokens);
 
   await saveToken(tokens);
-  console.log(chalk.green("\n✔ Authentication successful!"));
+  console.log(chalk.green("\nAuthentication successful."));
 
   return oauth2Client;
 }

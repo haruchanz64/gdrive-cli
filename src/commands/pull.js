@@ -83,7 +83,7 @@ cmd
       // Prompt the user for each conflicted file
       for (const remote of conflicts) {
         const rel = remote.relativePath;
-        console.log(chalk.yellow(`\n⚠ Conflict: ${rel}`));
+        console.log(chalk.yellow(`\nConflict: ${rel}`));
         console.log(chalk.dim("  Both local and remote have changed.\n"));
 
         const { resolution } = await inquirer.prompt([
@@ -114,7 +114,7 @@ cmd
       }
 
       if (toDownload.length === 0) {
-        console.log(chalk.green("\n✔ Already up to date"));
+        console.log(chalk.green("\nAlready up to date."));
         return;
       }
 
