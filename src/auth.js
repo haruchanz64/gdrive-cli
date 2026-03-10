@@ -1,5 +1,11 @@
 "use strict";
 
+/**
+ * @fileoverview Authentication module for gdrive-cli.
+ * Handles OAuth2 credential loading, token persistence via the OS credential
+ * store (keytar), the browser-based consent flow, and token lifecycle management.
+ */
+
 const fs = require("fs-extra");
 const http = require("http");
 const { google } = require("googleapis");
@@ -8,7 +14,7 @@ const path = require("path");
 const os = require("os");
 
 const CREDENTIALS_PATH = path.join(os.homedir(), ".gdrive", "credentials.json");
-// TOKEN_PATH kept for migration/logout purposes only
+/** @deprecated Used for migration and logout fallback only. Prefer OS keychain. */
 const TOKEN_PATH = path.join(os.homedir(), ".gdrive", "token.json");
 
 const KEYTAR_SERVICE = "gdrive-cli";
@@ -18,7 +24,14 @@ const SCOPES = ["https://www.googleapis.com/auth/drive"];
 const CALLBACK_PORT = 4242;
 const REDIRECT_URI = `http://localhost:${CALLBACK_PORT}`;
 
-// Lazy-load keytar so the app still runs if native module isn't built
+// ── Keytar ────────────────────────────────────────────────────────────────────
+
+/**
+ * Lazily require `keytar` so the application still starts if the native
+ * module has not been compiled (e.g. missing build tools).
+ *
+ * @returns {import('keytar') | null} The keytar module, or `null` if unavailable.
+ */
 function getKeytar() {
   try {
     return require("keytar");
@@ -27,21 +40,46 @@ function getKeytar() {
   }
 }
 
+// ── Token persistence ─────────────────────────────────────────────────────────
+
+/**
+ * Persist OAuth2 tokens to the OS credential store.
+ * Falls back to a JSON file (`TOKEN_PATH`) when keytar is unavailable,
+ * restricting the file to owner-only permissions on non-Windows platforms.
+ *
+ * @param {import('google-auth-library').Credentials} tokens - OAuth2 token object.
+ * @returns {Promise<void>}
+ */
 async function saveToken(tokens) {
   const keytar = getKeytar();
   if (keytar) {
-    await keytar.setPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT, JSON.stringify(tokens));
+    await keytar.setPassword(
+      KEYTAR_SERVICE,
+      KEYTAR_ACCOUNT,
+      JSON.stringify(tokens),
+    );
   } else {
-    // Fallback: encrypted-at-rest is not available, warn and use file
-    console.warn(chalk.yellow("  ⚠ keytar unavailable — falling back to file-based token storage."));
+    console.warn(
+      chalk.yellow(
+        "keytar unavailable — falling back to file-based token storage.",
+      ),
+    );
     await fs.outputJson(TOKEN_PATH, tokens, { spaces: 2 });
-    // Restrict permissions to owner read/write only
     if (process.platform !== "win32") {
       await fs.chmod(TOKEN_PATH, 0o600);
     }
   }
 }
 
+/**
+ * Load OAuth2 tokens from the OS credential store.
+ * If keytar is available but no token is stored there, attempts a one-time
+ * migration from the legacy `TOKEN_PATH` JSON file.
+ * Falls back to reading `TOKEN_PATH` directly when keytar is unavailable.
+ *
+ * @returns {Promise<import('google-auth-library').Credentials | null>}
+ *   The stored token object, or `null` if none exists.
+ */
 async function loadToken() {
   const keytar = getKeytar();
   if (keytar) {
@@ -60,24 +98,41 @@ async function loadToken() {
     return null;
   }
 
-  // Fallback: read from file
   if (await fs.pathExists(TOKEN_PATH)) {
     return fs.readJson(TOKEN_PATH);
   }
   return null;
 }
 
+/**
+ * Remove the stored OAuth2 token from the OS credential store and delete
+ * the legacy token file if it still exists on disk.
+ *
+ * @returns {Promise<void>}
+ */
 async function deleteToken() {
   const keytar = getKeytar();
   if (keytar) {
     await keytar.deletePassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT);
   }
-  // Always clean up the legacy file too
   if (await fs.pathExists(TOKEN_PATH)) {
     await fs.remove(TOKEN_PATH);
   }
 }
 
+// ── Auth client ───────────────────────────────────────────────────────────────
+
+/**
+ * Build and return an authenticated `OAuth2Client`.
+ *
+ * - Reads the OAuth2 app credentials from `CREDENTIALS_PATH`.
+ * - Restricts the credentials file to owner-only permissions (non-Windows).
+ * - If a token already exists, injects it and registers an auto-refresh listener.
+ * - If no token exists, starts the browser-based consent flow via `runBrowserFlow`.
+ *
+ * @throws {Error} When `CREDENTIALS_PATH` does not exist.
+ * @returns {Promise<import('google-auth-library').OAuth2Client>}
+ */
 async function getAuthClient() {
   if (!(await fs.pathExists(CREDENTIALS_PATH))) {
     throw new Error(
@@ -91,7 +146,6 @@ async function getAuthClient() {
     );
   }
 
-  // Restrict credentials file permissions on first access
   if (process.platform !== "win32") {
     await fs.chmod(CREDENTIALS_PATH, 0o600);
   }
@@ -108,7 +162,10 @@ async function getAuthClient() {
   const token = await loadToken();
   if (token) {
     oauth2Client.setCredentials(token);
-    // Persist refreshed tokens automatically
+    /**
+     * Automatically persist any refreshed tokens issued by Google so that
+     * the stored credentials never fall out of date.
+     */
     oauth2Client.on("tokens", async (newTokens) => {
       const existing = (await loadToken()) ?? {};
       await saveToken({ ...existing, ...newTokens });
@@ -119,6 +176,17 @@ async function getAuthClient() {
   return runBrowserFlow(oauth2Client);
 }
 
+// ── Browser OAuth flow ────────────────────────────────────────────────────────
+
+/**
+ * Start the OAuth2 browser consent flow.
+ * Generates the authorization URL, opens the user's browser, waits for the
+ * redirect callback, exchanges the code for tokens, and persists them.
+ *
+ * @param {import('google-auth-library').OAuth2Client} oauth2Client
+ * @returns {Promise<import('google-auth-library').OAuth2Client>}
+ *   The same client with credentials set.
+ */
 async function runBrowserFlow(oauth2Client) {
   const authUrl = oauth2Client.generateAuthUrl({
     access_type: "offline",
@@ -142,6 +210,15 @@ async function runBrowserFlow(oauth2Client) {
   return oauth2Client;
 }
 
+/**
+ * Spin up a temporary local HTTP server on `CALLBACK_PORT`, open the browser
+ * at `authUrl`, and resolve with the `code` query parameter once Google
+ * redirects back.
+ *
+ * @param {string} authUrl - The Google authorization URL to open.
+ * @returns {Promise<string>} The one-time authorization code from Google.
+ * @throws {Error} On OAuth errors, missing code, or port conflicts.
+ */
 function waitForCallbackCode(authUrl) {
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
@@ -154,8 +231,8 @@ function waitForCallbackCode(authUrl) {
         res.end(
           htmlPage(
             "Authentication Failed",
-            `Google returned: <b>${error}</b>`,
-            "#c0392b",
+            `Authorization was denied: ${error}.`,
+            false,
           ),
         );
         server.close(() => reject(new Error(`OAuth error: ${error}`)));
@@ -166,9 +243,9 @@ function waitForCallbackCode(authUrl) {
         res.writeHead(400, { "Content-Type": "text/html" });
         res.end(
           htmlPage(
-            "Missing Code",
-            "No authorization code received.",
-            "#c0392b",
+            "Missing Authorization Code",
+            "No authorization code was received.",
+            false,
           ),
         );
         server.close(() => reject(new Error("No code in callback")));
@@ -178,9 +255,8 @@ function waitForCallbackCode(authUrl) {
       res.writeHead(200, { "Content-Type": "text/html" });
       res.end(
         htmlPage(
-          "Authenticated!",
-          "You can close this tab and return to the terminal.",
-          "#27ae60",
+          "Authentication Successful",
+          "You may close this tab and return to the terminal.",
         ),
       );
       server.close(() => resolve(code));
@@ -197,7 +273,7 @@ function waitForCallbackCode(authUrl) {
         await openBrowser(authUrl);
         console.log(
           chalk.dim(
-            `\n  If the browser didn't open, visit this URL manually:\n`,
+            `\n  If the browser did not open, visit this URL manually:\n`,
           ) + chalk.cyan(`  ${authUrl}\n`),
         );
       } catch {
@@ -211,7 +287,9 @@ function waitForCallbackCode(authUrl) {
       if (err.code === "EADDRINUSE") {
         reject(
           new Error(
-            `Port ${CALLBACK_PORT} is already in use.\n  Windows: netstat -ano | findstr :${CALLBACK_PORT}`,
+            `Port ${CALLBACK_PORT} is already in use.\n` +
+              `  Windows: netstat -ano | findstr :${CALLBACK_PORT}\n` +
+              `  Linux/macOS: lsof -i :${CALLBACK_PORT}`,
           ),
         );
       } else {
@@ -221,6 +299,14 @@ function waitForCallbackCode(authUrl) {
   });
 }
 
+/**
+ * Open a URL in the user's default browser in a cross-platform manner.
+ * Uses `start` on Windows, `open` on macOS, and `xdg-open` on Linux.
+ *
+ * @param {string} url - The URL to open.
+ * @returns {Promise<void>}
+ * @throws {Error} When the platform command fails to execute.
+ */
 async function openBrowser(url) {
   const { exec } = require("child_process");
   const cmd =
@@ -234,31 +320,69 @@ async function openBrowser(url) {
   });
 }
 
-function htmlPage(title, message, color = "#2c3e50") {
+// ── HTML callback page ────────────────────────────────────────────────────────
+
+/**
+ * Generate a minimal, plain HTML page displayed in the browser after the
+ * OAuth2 redirect. Uses no external resources or JavaScript.
+ *
+ * @param {string}  title   - Page heading.
+ * @param {string}  message - Body message shown beneath the heading.
+ * @param {boolean} [success=true] - Controls the heading colour (green / red).
+ * @returns {string} A complete HTML document as a string.
+ */
+function htmlPage(title, message, success = true) {
+  const headingColor = success ? "#1a6b35" : "#a0200f";
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>gdrive-cli</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>gdrive-cli — ${title}</title>
   <style>
-    * { margin:0; padding:0; box-sizing:border-box }
-    body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-           display:flex; align-items:center; justify-content:center;
-           min-height:100vh; background:#f5f5f5 }
-    .card { background:white; border-radius:12px; padding:48px 56px;
-            box-shadow:0 4px 24px rgba(0,0,0,.08); text-align:center; max-width:420px; width:90% }
-    .icon { font-size:48px; margin-bottom:16px }
-    h1 { font-size:24px; color:${color}; margin-bottom:12px }
-    p { color:#666; font-size:15px; line-height:1.5 }
-    .brand { margin-top:32px; font-size:12px; color:#aaa }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      color: #1a1a1a;
+      background: #f7f7f7;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    main {
+      background: #ffffff;
+      border: 1px solid #d0d0d0;
+      border-radius: 6px;
+      padding: 40px 48px;
+      max-width: 480px;
+      width: 100%;
+    }
+    h1 {
+      font-size: 20px;
+      font-weight: 600;
+      color: ${headingColor};
+      margin-bottom: 12px;
+    }
+    p { color: #444; }
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid #e8e8e8;
+      font-size: 12px;
+      color: #888;
+    }
   </style>
 </head>
 <body>
-  <div class="card">
+  <main>
     <h1>${title}</h1>
     <p>${message}</p>
-    <p class="brand">gdrive-cli</p>
-  </div>
+    <footer>gdrive-cli</footer>
+  </main>
 </body>
 </html>`;
 }
