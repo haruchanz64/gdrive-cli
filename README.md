@@ -45,56 +45,95 @@ node cli.js <command>
 
 ## Setup
 
+> **Follow these steps in order.** You only need to do this once.
+
+### Step 1 — Create OAuth credentials on Google Cloud
+
 gdrive-cli uses Google OAuth2 to access your Drive. Because Google requires
 every third-party app to be registered, you need to create your own OAuth
-credentials once before using the tool. This takes about five minutes and
-is a one-time step.
-
-### 1. Create OAuth credentials
+credentials before using the tool. This takes about five minutes.
 
 1. Go to [console.cloud.google.com](https://console.cloud.google.com)
 2. Create a project (or select an existing one)
-3. Go to **APIs & Services -> Library**, search for **Google Drive API**, and enable it
-4. Go to **APIs & Services -> Credentials -> Create Credentials -> OAuth 2.0 Client ID**
-5. Choose **Desktop app**, give it any name, and click Create
+3. Go to **APIs & Services → Library**, search for **Google Drive API**, and enable it
+4. Go to **APIs & Services → Credentials → Create Credentials → OAuth 2.0 Client ID**
+5. Choose **Desktop app**, give it any name, and click **Create**
 6. On the credential detail page, add `http://localhost:4242` under **Authorized redirect URIs**
-7. Click **Download JSON** and save the file
+7. Click **Download JSON** and save the file somewhere on your machine (e.g. `~/Downloads/client_secret.json`)
 
-### 2. Configure the CLI
+---
+
+### Step 2 — Save the credentials file
+
+Point the CLI to the JSON file you just downloaded:
 
 ```bash
 gdrive auth setup --file ~/Downloads/client_secret.json
 ```
 
-### 3. Log in
+> This copies the file to `~/.gdrive/credentials.json`.  
+> You do **not** need to run this again unless you rotate your credentials.
+
+---
+
+### Step 3 — Log in to your Google account
 
 ```bash
 gdrive auth login
 ```
 
 Your browser opens automatically. Sign in with your Google account and click
-Allow. The terminal confirms when authentication is complete — no code to
+**Allow**. The terminal confirms when authentication is complete — no code to
 copy and paste.
+
+To verify you are logged in:
+
+```bash
+gdrive auth whoami
+```
+
+```
+Authenticated User
+  Name:    Jane Doe
+  Email:   jane@gmail.com
+  Storage: 4.20 GB / 15.00 GB
+```
+
+---
+
+### Full setup at a glance
+
+```bash
+# 1. Download your credentials JSON from Google Cloud Console (manual step above)
+
+# 2. Save it to the CLI config
+gdrive auth setup --file ~/Downloads/client_secret.json
+
+# 3. Log in — opens your browser
+gdrive auth login
+
+# 4. Confirm you are authenticated
+gdrive auth whoami
+```
 
 ---
 
 ## Quick start
 
 ```bash
-# Start in your project directory
+# Go to the directory you want to sync
 cd my-project
 
-# Option 1: Create a new Drive folder automatically (uses local directory name)
+# Option A: Create a new Drive folder automatically (uses the current directory name)
 gdrive init
 
-# Option 2: Create a new Drive folder with a custom name
+# Option B: Create a new Drive folder with a custom name
 gdrive init --name "My Project Folder"
 
-# Option 3: Link to an existing Drive folder
+# Option C: Link to an existing Drive folder
 gdrive init https://drive.google.com/drive/folders/1xYzABC...
-```
 
-# See what is on the remote
+# See what is different between local and remote
 gdrive status
 
 # Download everything from Drive
@@ -102,10 +141,22 @@ gdrive pull
 
 # Make some changes, then upload them
 gdrive push
+```
 
 ---
 
 ## Commands
+
+### `gdrive auth`
+
+```bash
+gdrive auth setup --file <path>   # Step 1: save your OAuth credentials JSON
+gdrive auth login                  # Step 2: open browser and authenticate
+gdrive auth whoami                 # Show current user and storage quota
+gdrive auth logout                 # Remove stored token (run login again to re-authenticate)
+```
+
+---
 
 ### `gdrive init [folderUrl]`
 
@@ -113,7 +164,7 @@ Initialize the current directory as a gdrive repository.
 
 - If `folderUrl` (or raw folder ID) is provided, links to that existing Drive folder.
 - If omitted, creates a new Drive folder automatically.
-- Use `--name <n>` to set the remote folder name when creating a folder (or override display name when linking).
+- Use `--name <n>` to set the remote folder name when creating (or override the display name when linking).
 - Creates `.gdrive/` with `config.json` and `index.json`.
 - Creates `.gdriveignore` if missing.
 - If `.gitignore` exists, appends `.gdrive/` when not already present.
@@ -129,9 +180,6 @@ gdrive init --name "Project Backup"
 gdrive init https://drive.google.com/drive/folders/1xYzABC...
 gdrive init 1xYzABC...    # raw folder ID also works
 ```
-
-Creates a `.gdrive/` directory with `config.json` (folder ID) and
-`index.json` (file state snapshot).
 
 ---
 
@@ -178,7 +226,7 @@ When a file has been changed both locally and on Drive, the CLI prompts you
 to resolve the conflict:
 
 ```
-Conflict: report.pdf
+⚠ Conflict: report.pdf
   Both local and remote have changed.
 
 ? How do you want to resolve this?
@@ -225,17 +273,6 @@ gdrive log -n 10         # show up to 10 revisions per file
 
 ---
 
-### `gdrive auth`
-
-```bash
-gdrive auth setup --file <path>   # configure OAuth credentials
-gdrive auth login                  # open browser and authenticate
-gdrive auth logout                 # remove stored token
-gdrive auth whoami                 # show current user and storage quota
-```
-
----
-
 ## .gdriveignore
 
 Place a `.gdriveignore` file in your project root to exclude files and
@@ -257,7 +294,7 @@ node_modules/
 ```
 
 A default `.gdriveignore` is created automatically when you run `gdrive init`
-(or `gdrive clone`) if one does not already exist.
+or `gdrive clone` if one does not already exist.
 
 ---
 
@@ -283,8 +320,9 @@ content changing will not be flagged as modified.
 | same | different | Pull needed |
 | different | different | Conflict |
 
-Credentials and tokens are stored in `~/.gdrive/` on your machine and are
-never written to the project directory.
+OAuth tokens are stored securely in your OS credential store
+(Windows Credential Manager, macOS Keychain, or libsecret on Linux)
+and are never written to the project directory.
 
 ---
 
@@ -308,4 +346,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-MIT
+MIT License — Copyright (c) 2026 gdrive-cli contributors.  
+See the [LICENSE](LICENSE) file for the full license text.
