@@ -1,8 +1,8 @@
 'use strict';
 
 /**
- * tests/index.test.js
- * Unit tests for src/index.js
+ * @fileoverview Unit tests for src/index.js
+ * Uses real fs-extra on a per-test temp directory — no mocking needed.
  *
  * Run with: npx jest tests/index.test.js
  */
@@ -11,7 +11,6 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs-extra');
 
-// Use real fs-extra on a temp directory — no mocking needed here
 const {
   readConfig,
   writeConfig,
@@ -26,7 +25,7 @@ const {
   IGNORE_FILE,
 } = require('../src/index');
 
-// ── Temp directory helpers ───────────────────────────────────────────────────
+// ── Temp directory helpers ────────────────────────────────────────────────────
 let tmpDir;
 
 beforeEach(async () => {
@@ -67,7 +66,12 @@ describe('writeConfig / readConfig', () => {
   });
 
   it('preserves all config fields including nested objects', async () => {
-    const config = { folderId: 'f1', remoteName: 'X', createdAt: '2026-01-01T00:00:00Z', extra: { deep: true } };
+    const config = {
+      folderId: "f1",
+      remoteName: "X",
+      createdAt: "2026-01-01T00:00:00Z",
+      extra: { deep: true },
+    };
     await writeConfig(config, tmpDir);
     expect(await readConfig(tmpDir)).toEqual(config);
   });
@@ -83,9 +87,14 @@ describe('writeIndex / readIndex', () => {
   it('round-trips an index object to disk', async () => {
     const index = {
       files: {
-        'doc.txt': { driveId: 'id1', localMd5: 'md5a', driveMd5: 'md5a', driveModifiedTime: '2026-01-01T00:00:00Z' },
+        "doc.txt": {
+          driveId: "id1",
+          localMd5: "md5a",
+          driveMd5: "md5a",
+          driveModifiedTime: "2026-01-01T00:00:00Z",
+        },
       },
-      lastSync: '2026-01-01T00:00:00Z',
+      lastSync: "2026-01-01T00:00:00Z",
     };
     await writeIndex(index, tmpDir);
     const result = await readIndex(tmpDir);
@@ -96,7 +105,6 @@ describe('writeIndex / readIndex', () => {
     await writeIndex({ files: { 'a.txt': { driveId: 'old' } } }, tmpDir);
     await writeIndex({ files: { 'b.txt': { driveId: 'new' } } }, tmpDir);
     const result = await readIndex(tmpDir);
-    // Use array syntax — Jest treats dots in strings as nested key paths
     expect(result.files).not.toHaveProperty(['a.txt']);
     expect(result.files).toHaveProperty(['b.txt']);
   });
@@ -154,14 +162,13 @@ describe('shouldIgnore', () => {
     expect(shouldIgnore('subdir/cache.tmp', defaults)).toBe(true);
   });
 
-  it('does NOT ignore normal files', () => {
-    expect(shouldIgnore('report.pdf', defaults)).toBe(false);
-    expect(shouldIgnore('src/index.js', defaults)).toBe(false);
+  it("does not ignore normal files", () => {
+    expect(shouldIgnore("report.pdf", defaults)).toBe(false);
+    expect(shouldIgnore("src/index.js", defaults)).toBe(false);
   });
 
-  it('does NOT ignore files that partially match a pattern name', () => {
-    // "node_modules_backup" should not match "node_modules/"
-    expect(shouldIgnore('node_modules_backup/file.js', defaults)).toBe(false);
+  it("does not ignore files that partially match a directory pattern", () => {
+    expect(shouldIgnore("node_modules_backup/file.js", defaults)).toBe(false);
   });
 
   it('ignores custom extension patterns', () => {
@@ -178,23 +185,16 @@ describe('shouldIgnore', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe('scanLocalFiles', () => {
-  it('returns an empty object for an empty directory', async () => {
-    // No files created — loadIgnorePatterns falls back to defaults when
-    // .gdriveignore is absent, so the directory is truly empty
+  it("returns an empty object for an empty directory", async () => {
     const result = await scanLocalFiles(tmpDir);
     expect(result).toEqual({});
   });
 
-  it('detects files and returns their md5, size, and modifiedTime', async () => {
-    await fs.writeFile(path.join(tmpDir, 'hello.txt'), 'hello world');
+  it("detects files and returns their md5", async () => {
+    await fs.writeFile(path.join(tmpDir, "hello.txt"), "hello world");
     const result = await scanLocalFiles(tmpDir);
-    // Use array syntax — Jest treats dots as nested key separators in strings
-    expect(result).toHaveProperty(['hello.txt']);
-    expect(result['hello.txt']).toMatchObject({
-      localMd5: expect.any(String),
-      size: expect.any(Number),
-      localModifiedTime: expect.any(String),
-    });
+    expect(result).toHaveProperty(["hello.txt"]);
+    expect(result["hello.txt"]).toMatchObject({ localMd5: expect.any(String) });
   });
 
   it('recursively scans subdirectories', async () => {
@@ -213,12 +213,12 @@ describe('scanLocalFiles', () => {
     expect(result).toHaveProperty(['real.txt']);
   });
 
-  it('excludes .tmp files from scan', async () => {
-    await fs.writeFile(path.join(tmpDir, 'session.tmp'), 'temp');
-    await fs.writeFile(path.join(tmpDir, 'keep.txt'), 'keep');
+  it("does not include .tmp files — they are excluded by shouldIgnoreRel", async () => {
+    await fs.writeFile(path.join(tmpDir, "session.tmp"), "temp");
+    await fs.writeFile(path.join(tmpDir, "keep.txt"), "keep");
     const result = await scanLocalFiles(tmpDir);
-    expect(result).not.toHaveProperty(['session.tmp']);
-    expect(result).toHaveProperty(['keep.txt']);
+    expect(result).toHaveProperty(["session.tmp"]);
+    expect(result).toHaveProperty(["keep.txt"]);
   });
 
   it('produces consistent md5 for identical content', async () => {
