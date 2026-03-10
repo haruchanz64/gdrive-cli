@@ -1,6 +1,6 @@
 {
-  "name": "gdrive-cli",
-  "version": "1.0.0",
+  "name": "@haruchanz64/gdrive-cli",
+  "version": "1.0.1",
   "description": "A Git-like CLI for Google Drive — pull, push, status, diff and more.",
   "main": "cli.js",
   "bin": {

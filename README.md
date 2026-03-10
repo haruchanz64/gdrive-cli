@@ -32,7 +32,7 @@ Changes to pull (remote -> local):
 ## Installation
 
 ```bash
-npm install -g .
+npm install -g @haruchanz64/gdrive-cli
 ```
 
 Or run without installing:
