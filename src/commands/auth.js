@@ -8,12 +8,7 @@
 const { Command } = require('commander');
 const chalk = require('chalk');
 const fs = require('fs-extra');
-const {
-  getAuthClient,
-  CREDENTIALS_PATH,
-  TOKEN_PATH,
-  deleteToken,
-} = require("../auth");
+const { getAuthClient, CREDENTIALS_PATH, deleteToken } = require("../auth");
 
 const cmd = new Command('auth');
 cmd.description('Manage Google Drive authentication');
