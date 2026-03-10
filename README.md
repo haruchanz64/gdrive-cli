@@ -153,8 +153,37 @@ gdrive push
 gdrive auth setup --file <path>   # Step 1: save your OAuth credentials JSON
 gdrive auth login                  # Step 2: open browser and authenticate
 gdrive auth whoami                 # Show current user and storage quota
-gdrive auth logout                 # Remove stored token (run login again to re-authenticate)
+gdrive auth switch                 # Sign out and log in as a different account
+gdrive auth logout                 # Remove stored token
 ```
+
+#### Switching accounts
+
+If you need to use gdrive-cli with a different Google account, run:
+
+```bash
+gdrive auth switch
+```
+
+This removes the currently stored token and immediately opens your browser
+so you can sign in with a different account. When complete, the terminal
+confirms the new account:
+
+```
+Signing out of current account...
+  Token removed.
+
+Starting login for new account...
+
+Authenticated User
+  Name:    John Doe
+  Email:   john@gmail.com
+  Storage: 1.50 GB / 15.00 GB
+```
+
+> `gdrive auth switch` is equivalent to running `gdrive auth logout` followed
+> by `gdrive auth login`, but does both in a single step and confirms the new
+> account automatically.
 
 ---
 

@@ -120,4 +120,34 @@ cmd
     }
   });
 
+/**
+ * `gdrive auth switch`
+ * Removes the currently stored OAuth2 token and immediately starts a new
+ * browser-based login flow, allowing the user to authenticate with a
+ * different Google account.
+ */
+cmd
+  .command('switch')
+  .description('Switch to a different Google account')
+  .action(async () => {
+    try {
+      console.log(chalk.cyan('Signing out of current account...'));
+      await deleteToken();
+      console.log(chalk.dim('  Token removed.'));
+
+      console.log(chalk.cyan('\nStarting login for new account...'));
+      const auth = await getAuthClient();
+
+      const { google } = require('googleapis');
+      const drive = google.drive({ version: 'v3', auth });
+      const res = await drive.about.get({ fields: 'user' });
+      const user = res.data.user;
+
+      console.log(chalk.green(`\nSwitched to ${user.displayName} (${user.emailAddress})`));
+    } catch (err) {
+      console.error(chalk.red('Error: ' + err.message));
+      process.exit(1);
+    }
+  });
+
 module.exports = cmd;
