@@ -1,5 +1,11 @@
 'use strict';
 
+/**
+ * @fileoverview Init command for gdrive-cli.
+ * Initialises the current directory as a gdrive-cli tracked repository,
+ * either linking to an existing Drive folder or creating a new one.
+ */
+
 const { Command } = require('commander');
 const chalk = require('chalk');
 const path = require('path');
@@ -11,6 +17,13 @@ const { execFile } = require('child_process');
 const { promisify } = require('util');
 const execFileAsync = promisify(execFile);
 
+/**
+ * Hides a directory on Windows by setting the hidden attribute via `attrib`.
+ * No-op on non-Windows platforms.
+ *
+ * @param {string} dirPath - Absolute path to the directory to hide.
+ * @returns {Promise<void>}
+ */
 async function hideDirectoryOnWindows(dirPath) {
   if (process.platform !== 'win32') return;
   try {
@@ -22,6 +35,23 @@ async function hideDirectoryOnWindows(dirPath) {
 
 const cmd = new Command('init');
 
+/**
+ * `gdrive init [folderUrl]`
+ *
+ * Initialises a gdrive repository in the current working directory.
+ * - If `folderUrl` is provided, links to the existing Drive folder.
+ * - If omitted, creates a new Drive folder named after the current directory
+ *   (or the value passed via `--name`).
+ *
+ * Side effects:
+ * - Writes `.gdrive/config.json` and `.gdrive/index.json`.
+ * - Appends `.gdrive/` to `.gitignore` when a git project is detected.
+ * - Creates a default `.gdriveignore` file if one does not already exist.
+ * - Hides the `.gdrive` directory on Windows.
+ *
+ * @argument {string} [folderUrl] - Google Drive folder URL or raw folder ID.
+ * @option {string} [--name] - Override name for the new Drive folder.
+ */
 cmd
   .description('Initialize a gdrive repository, creating the Drive folder automatically')
   .argument('[folderUrl]', 'Link to an existing Drive folder URL or ID (optional)')
@@ -35,7 +65,7 @@ cmd
       if (await fs.pathExists(gdrivePath)) {
         const shownPath = gdrivePath.replace(/\\/g, '/') + '/';
         console.log(chalk.yellow(`Reinitialized existing gdrive repository in ${shownPath}`));
-        return; // success, like git init
+        return;
       }
 
       console.log(chalk.cyan('Authenticating...'));
@@ -82,7 +112,6 @@ cmd
         console.log(chalk.dim(`  Created at ${chalk.white(created.webViewLink)}`));
       }
 
-      // Write config and empty index
       await writeConfig({ folderId, remoteName, createdAt: new Date().toISOString() });
       await writeIndex({ files: {}, lastSync: null });
 

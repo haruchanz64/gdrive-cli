@@ -1,14 +1,30 @@
 'use strict';
 
+/**
+ * @fileoverview Authentication commands for gdrive-cli.
+ * Handles OAuth2 setup, login, logout, and user info display.
+ */
+
 const { Command } = require('commander');
 const chalk = require('chalk');
 const fs = require('fs-extra');
-const { getAuthClient, CREDENTIALS_PATH, TOKEN_PATH } = require('../auth');
+const {
+  getAuthClient,
+  CREDENTIALS_PATH,
+  TOKEN_PATH,
+  deleteToken,
+} = require("../auth");
 
 const cmd = new Command('auth');
 cmd.description('Manage Google Drive authentication');
 
-// gdrive auth setup
+/**
+ * `gdrive auth setup`
+ * Copies a downloaded OAuth2 credentials JSON to the expected config path,
+ * or prints manual setup instructions if no file is provided.
+ *
+ * @option {string} [--file] - Path to the downloaded credentials JSON file.
+ */
 cmd
   .command('setup')
   .description('Configure OAuth2 credentials')
@@ -33,7 +49,11 @@ cmd
     }
   });
 
-// gdrive auth login
+/**
+ * `gdrive auth login`
+ * Initiates the OAuth2 browser flow and verifies authentication
+ * by fetching the authenticated user's profile from Google Drive.
+ */
 cmd
   .command('login')
   .description('Authenticate with Google Drive')
@@ -51,25 +71,29 @@ cmd
     }
   });
 
-// gdrive auth logout
+/**
+ * `gdrive auth logout`
+ * Removes the stored OAuth2 token from the OS credential store
+ * and deletes any legacy token file on disk.
+ */
 cmd
   .command('logout')
   .description('Remove stored authentication token')
   .action(async () => {
     try {
-      if (await fs.pathExists(TOKEN_PATH)) {
-        await fs.remove(TOKEN_PATH);
-        console.log(chalk.green('Logged out. Token removed.'));
-      } else {
-        console.log(chalk.yellow('No active session found.'));
-      }
+      await deleteToken();
+      console.log(chalk.green("Logged out. Token removed."));
     } catch (err) {
       console.error(chalk.red('Error: ' + err.message));
       process.exit(1);
     }
   });
 
-// gdrive auth whoami
+/**
+ * `gdrive auth whoami`
+ * Displays the authenticated user's display name, email address,
+ * and current Google Drive storage usage.
+ */
 cmd
   .command('whoami')
   .description('Show currently authenticated user')

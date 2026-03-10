@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 'use strict';
 
+/**
+ * @fileoverview Main CLI entry point for gdrive-cli.
+ * Registers all sub-commands and parses process arguments.
+ */
+
 const { program } = require('commander');
 const chalk = require('chalk');
 const { version } = require('./package.json');
